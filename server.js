@@ -1,12 +1,40 @@
+
+
+
+
+
 import betterSqlite3 from "better-sqlite3";
 import { readFileSync } from 'fs';
 import { createServer } from 'https';
-import mpv from "node-mpv";
+import mpvAPI from "node-mpv";
 import SpotifyToYoutube from 'spotify-to-youtube';
 import { parse } from "spotify-uri";
 import SpotifyWebApi from 'spotify-web-api-node';
 import { WebSocket, WebSocketServer } from "ws";
 import ytdl from "ytdl-core";
+
+// // where you want to initialise the API
+// const mpvPlayer = new mpvAPI();
+
+// // somewhere within an async context
+// // starts MPV
+// try{
+// 	console.log('starting')
+//   await mpvPlayer.start()
+// 	console.log("started");
+//   // loads a file
+//   await mpvPlayer.load('rapoftimes.wav');
+// 	console.log("loaded");
+//   // file is playing
+//   await mpvPlayer.volume(30);
+// }
+// catch (error) {
+//   // handle errors here
+//   console.log(error);
+// }
+
+
+
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -77,13 +105,10 @@ var playerState = {
 
 // MPV
 console.log("initializing mpv");
-const mpvPlayer = new mpv({
+const mpvPlayer = new mpvAPI({
     "audio-only": true
 })
 
-//await delay(100)
-
-console.log("mpv initialized");
 
 mpvPlayer.on("stopped", function () {
     console.log("player stop")
@@ -97,6 +122,8 @@ mpvPlayer.on("timeposition", function (time) {
 mpvPlayer.on('statuschange', mpvStatus => {
 	console.log('mpvstatus', mpvStatus);
 })
+
+
 
 // send time position every second
 setInterval(() => {
@@ -148,21 +175,21 @@ async function enqueue(srcUrl, queuedBy) {
     }
 }
 
-function play() {
+async function play() {
     playerState.playing = true;
-    mpvPlayer.play()
+    await mpvPlayer.play()
     broadcast("playing", { playing: true });
 }
 
-function pause() {
+async function pause() {
     playerState.playing = false;
-    mpvPlayer.pause()
+    await mpvPlayer.pause()
     broadcast("playing", { playing: false });
 }
 
-function setVolume(volume) {
+async function setVolume(volume) {
     playerState.volume = volume;
-    mpvPlayer.volume(volume * 100)
+    await mpvPlayer.volume(volume * 100)
     broadcast("volume", { volume });
 }
 
@@ -189,7 +216,7 @@ async function next() {
     if (!newCurrentSong) {
         setCurrentSong(null)
         setTime(0);
-        mpvPlayer.pause();
+        await mpvPlayer.pause();
         return;
     }
 
@@ -197,8 +224,8 @@ async function next() {
     setCurrentSong(newCurrentSong)
     setTime(0);
 
-    mpvPlayer.load(newCurrentSong.playUrl)
-    mpvPlayer.play()
+    await mpvPlayer.load(newCurrentSong.playUrl)
+    await mpvPlayer.play()
 
     setLoading(false);
 }
@@ -240,28 +267,35 @@ wss.on("connection", (ws) => {
                 break;
             case "play":
                 storeInLog("play", null, message.user)
-                play();
+                await play();
                 break;
             case "pause":
                 storeInLog("pause", null, message.user)
-                pause();
+                await pause();
                 break;
             case "skip":
                 storeInLog("skip", playerState.currentSong.title, message.user)
                 next();
                 break;
             case "volume":
-                // if this function wasn't called for 0.5 seconds, store in log
+                // debounce logging to 0.5s
                 clearTimeout(timeout);
                 timeout = setTimeout(() => {
                     storeInLog("volume", message.volume, message.user)
                 }, 500)
 
-                setVolume(message.volume);
+                await setVolume(message.volume);
                 break;
         }
     });
 });
 
-server.listen(8080);
-console.log("server listening at 8080")
+mpvPlayer.start()
+.then(() => {
+	server.listen(8080);
+	console.log("server listening at 8080")
+})
+.catch((error) => {
+	console.error("MPV Failed to initialize. Aborting.");
+	console.error(error);
+})
