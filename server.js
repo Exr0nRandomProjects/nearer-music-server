@@ -86,7 +86,7 @@ mpvPlayer.start()
     console.log("MPV initialized successfully. setting up other servers")
 
     mpvPlayer.on("stopped", function () {
-        console.log("player stop")
+        console.log(new Date(), "player stop (song ended?)")
         next();
     })
 
@@ -207,6 +207,7 @@ mpvPlayer.start()
     }
 
     async function next() {
+        console.log(new Date(), "next() called")
         const newCurrentSong = playerState?.currentSong ?
             db.prepare("SELECT * FROM queue WHERE id > ? ORDER BY id ASC LIMIT 1").get(playerState?.currentSong?.id) :
             db.prepare("SELECT * FROM queue ORDER BY id DESC LIMIT 1").get();
@@ -222,8 +223,13 @@ mpvPlayer.start()
         setCurrentSong(newCurrentSong)
         setTime(0);
 
+        console.log(new Date(), "loading song...", newCurrentSong.playUrl)
+
         await mpvPlayer.load(newCurrentSong.playUrl).catch(console.error)
+        console.log(new Date(), "playing song...", newCurrentSong.playUrl)
         await mpvPlayer.play().catch(console.error)
+
+        console.log(new Date(), "song loaded and playing")
 
         setLoading(false);
     }
