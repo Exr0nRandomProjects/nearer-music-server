@@ -122,7 +122,7 @@ mpvPlayer.start()
     }
 
     // EVENT HANDLERS
-    async function enqueue(srcUrl, queuedBy) {
+    async function enqueueSong(srcUrl, queuedBy) {
         console.log(`${queuedBy} added ${srcUrl} to queue`)
 
         try {
@@ -143,7 +143,7 @@ mpvPlayer.start()
             const stmt = db.prepare("INSERT INTO queue (srcUrl, playUrl, title, length, thumbnail, queuedBy) VALUES (?, ?, ?, ?, ?, ?)");
             const res = stmt.run(srcUrl, playUrl, title, length, thumbnail, queuedBy);
 
-            storeInLog("enqueue", title, queuedBy)
+            storeInLog("enqueueSong", title, queuedBy)
 
             if (!playerState.currentSong) {
                 next();
@@ -153,6 +153,23 @@ mpvPlayer.start()
         } catch (e) {
             console.log(e)
             broadcast("failed", { url: srcUrl })
+        }
+    }
+    async function enqueuePlaylist(playlistURL, queuedBy) {
+        // convert playlist url to playlist id
+        const playlist_id = await spotifyApi.getPlaylist(playlistURL).then(data => data.body.id)
+        await spotifyApi.getPlaylistTracks(playlist_id, {
+            limit: 100 // check if .next is null to see if theres another page
+        })
+        .then(data => data.body.items.map(item => item.track.uri))  // get track uris 
+        .then(uris => uris.forEach(uri => enqueue(uri, queuedBy)))
+        .catch(() => console.error(`Failed to queue playlist ${playlist_id}`))
+    }
+    async function enqueue(ytOrSongOrPlaylistURL, queuedBy) {
+        if (ytOrSongOrPlaylistURL.includes('spotify.com/playlist')) {
+            await enqueuePlaylist(ytOrSongOrPlaylistURL, queuedBy)
+        } else {
+            await enqueueSong(ytOrSongOrPlaylistURL, queuedBy)
         }
     }
 

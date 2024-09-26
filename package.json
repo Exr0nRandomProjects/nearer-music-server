@@ -1,7 +1,7 @@
 {
   "type": "module",
   "dependencies": {
-    "better-sqlite3": "^8.0.1",
+    "better-sqlite3": "^8.7.0",
     "node-mpv": "^2.0.0-beta.2",
     "spotify-to-youtube": "^1.0.2",
     "spotify-uri": "^3.0.3",
